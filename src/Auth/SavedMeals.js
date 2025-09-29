@@ -1,14 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "./AuthContext";
 import RecipeCard from "../Components/RecipeCard";
 import { Link } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
+import RecipeModal from "../Components/RecipeModal"; // ✅ Import the modal
 
 const SavedMeals = () => {
   const { favorites, toggleFavorite } = useAuth();
+  const [selectedRecipe, setSelectedRecipe] = useState(null); // ✅ Modal state
 
   const isFavorite = (recipe) =>
     favorites.some((fav) => fav.uri === recipe.uri);
+
+  const handleRecipeClick = (recipe) => {
+    setSelectedRecipe(recipe); // ✅ Open modal
+  };
 
   return (
     <div className="bg-gradient-to-tr from-cyan-50 to-purple-100 min-h-screen p-6">
@@ -38,14 +44,22 @@ const SavedMeals = () => {
             <RecipeCard
               key={index}
               recipe={recipe}
-              onClick={() => {}}
+              onClick={() => handleRecipeClick(recipe)} // ✅ Open modal
               isFavorite={isFavorite}
-              toggleFavorite={() => {}} // Disable heart button
+              toggleFavorite={toggleFavorite} // ✅ Enable heart toggle
               hideFavoriteButton={true} // ✅ Hides "♥ Saved"
               onDelete={toggleFavorite} // ✅ Enables X button
             />
           ))}
         </div>
+      )}
+
+      {/* Modal */}
+      {selectedRecipe && (
+        <RecipeModal
+          recipe={selectedRecipe}
+          onClose={() => setSelectedRecipe(null)}
+        />
       )}
     </div>
   );

@@ -50,48 +50,72 @@ const RecipeSearch = () => {
     localStorage.setItem("searchHistory", JSON.stringify(updatedHistory));
   };
 
-  const fetchRecipes = useCallback(async (query, filters, mealType) => {
+ const fetchRecipes = useCallback(async (query, filters, mealType) => {
+  try {
+    setIsLoading(true);
+
+    // Dietary filters
+    const dietLabels = Object.keys(filters)
+      .filter((key) => filters[key])
+      .join(",");
+
+    // Fallback query
+    const randomQuery = commonSearchTerms[Math.floor(Math.random() * commonSearchTerms.length)];
+    const searchQuery = query || randomQuery;
+
+    // Build params
+    const params = {
+      type: "public",
+      q: searchQuery,
+      app_id: process.env.REACT_APP_EDAMAM_APP_ID,
+      app_key: process.env.REACT_APP_EDAMAM_APP_KEY,
+    };
+    if (dietLabels) params.diet = dietLabels;
+    if (mealType) params.mealType = mealType;
+
+    let response;
+
     try {
-      setIsLoading(true);
-      const dietLabels = Object.keys(filters)
-        .filter((key) => filters[key])
-        .join(",");
-      const randomQuery = commonSearchTerms[Math.floor(Math.random() * commonSearchTerms.length)];
-      const searchQuery = query || randomQuery;
-
-      const response = await axios.get("http://localhost:5050/api/recipes", {
-        params: {
-          q: searchQuery,
-          diet: dietLabels,
-          mealType: mealType,
-        },
-      });
-
-      if (response.data.hits.length === 0) {
-        setError("No recipes found for the selected dietary options.");
-        setRecipes([]);
-      } else {
-        setError("");
-        let result = response.data.hits;
-
-        if (sortOption === "calories-asc") {
-          result.sort((a, b) => a.recipe.calories - b.recipe.calories);
-        } else if (sortOption === "calories-desc") {
-          result.sort((a, b) => b.recipe.calories - a.recipe.calories);
-        } else if (sortOption === "name-asc") {
-          result.sort((a, b) => a.recipe.label.localeCompare(b.recipe.label));
-        }
-
-        setRecipes(result);
-        if (query) updateSearchHistory(query);
-      }
-    } catch (error) {
-      console.error("❌ Error fetching recipes:", error);
-      setError("Error fetching the recipes. Please try again.");
-    } finally {
-      setIsLoading(false);
+      // Try direct request first
+      response = await axios.get("https://api.edamam.com/api/recipes/v2", { params });
+    } catch (err) {
+      console.warn("Direct request failed, retrying via proxy...");
+      // Fallback: use free CORS proxy
+      response = await axios.get(
+        "https://cors-anywhere.herokuapp.com/https://api.edamam.com/api/recipes/v2",
+        { params }
+      );
     }
-  }, [sortOption, searchHistory]);
+
+    const data = response.data.hits;
+
+    if (!data || data.length === 0) {
+      setError("No recipes found for the selected dietary options.");
+      setRecipes([]);
+    } else {
+      setError("");
+      let result = data;
+
+      // Sorting logic
+      if (sortOption === "calories-asc") {
+        result.sort((a, b) => a.recipe.calories - b.recipe.calories);
+      } else if (sortOption === "calories-desc") {
+        result.sort((a, b) => b.recipe.calories - a.recipe.calories);
+      } else if (sortOption === "name-asc") {
+        result.sort((a, b) => a.recipe.label.localeCompare(b.recipe.label));
+      }
+
+      setRecipes(result);
+      if (query) updateSearchHistory(query);
+    }
+  } catch (error) {
+    console.error("❌ Error fetching recipes:", error);
+    setError("Error fetching the recipes. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+}, [sortOption, searchHistory]);
+
 
   useEffect(() => {
     fetchRecipes(query || "chicken", filters);
